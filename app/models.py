@@ -32,9 +32,15 @@ class Order(db.Model):
     # Required fields from Node.js model
     customerName = db.Column(db.String(255), nullable=False)
     
+    # New Fields to match Node.js
+    tableNumber = db.Column(db.String(255))
+    customerPhone = db.Column(db.String(255))
+    customerEmail = db.Column(db.String(255))
+    notes = db.Column(db.Text)
+    
     # Corrected Status fields
     orderStatus = db.Column(db.String(255), default="WAITING") # Map status -> orderStatus
-    orderType = db.Column(db.String(255), default="BULK")
+    orderType = db.Column(db.String(255), default="") # Changed default to empty string as requested
     
     # Other fields
     tableStatus = db.Column(db.String(255), default="AVAILABLE")

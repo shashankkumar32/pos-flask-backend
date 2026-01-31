@@ -27,12 +27,19 @@ def bulk_create_orders(current_user):
                     userId=current_user.id,
                     branchId=current_user.mainBranchId, # Assign to user's main branch
                     totalAmount=order_data.get('totalAmount'),
+                    
+                    # New Fields mapping
+                    tableNumber=order_data.get('tableNumber'),
+                    customerPhone=order_data.get('customerPhone'),
+                    customerEmail=order_data.get('customerEmail'),
+                    notes=order_data.get('notes'),
+                    
                     # Map 'status' to 'orderStatus'
                     orderStatus=order_data.get('status', 'WAITING'),
                     # Required field - default if not provided
                     customerName=order_data.get('customerName', 'Bulk Customer'),
-                    # Default type for these imports
-                    orderType='BULK'
+                    # Default type for these imports - default now empty string
+                    orderType=order_data.get('orderType', '')
                 )
                 db.session.add(new_order)
                 db.session.flush() # Flush to get order ID
