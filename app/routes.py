@@ -8,6 +8,10 @@ import json
 
 bp = Blueprint('api', __name__, url_prefix='/api')
 
+@bp.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({'status': 'healthy', 'timestamp': datetime.datetime.utcnow().isoformat()}), 200
+
 @bp.route('/auth/electron/signin', methods=['POST'])
 def electron_signin():
     data = request.get_json()
