@@ -8,9 +8,17 @@ def token_required(f):
     def decorated(*args, **kwargs):
         token = None
         
-        # Check for x-access-token header (matching Node.js app)
+        # 1. Check for x-access-token header (matching Node.js app)
         if 'x-access-token' in request.headers:
             token = request.headers['x-access-token']
+        
+        # 2. Check for Authorization header
+        elif 'Authorization' in request.headers:
+            auth_header = request.headers['Authorization']
+            if auth_header.startswith('Bearer '):
+                token = auth_header.split(" ")[1]
+            else:
+                token = auth_header # Allow direct token paste
         
         if not token:
             return jsonify({'message': 'Token is missing!'}), 401
@@ -25,8 +33,15 @@ def token_required(f):
                 
         except jwt.ExpiredSignatureError:
              return jsonify({'message': 'Token has expired!'}), 401
+        except jwt.InvalidTokenError:
+             return jsonify({'message': 'Token is invalid!'}), 401
         except Exception as e:
-            return jsonify({'message': 'Token is invalid!', 'error': str(e)}), 401
+            # If it's a database connection error or similar server issue
+            # Return 500 so the user knows it's a server/DB problem, not an auth problem
+            return jsonify({
+                'message': 'Internal Server Error (Database likely unreachable or limit reached)',
+                'error': str(e)
+            }), 500
             
         return f(current_user, *args, **kwargs)
     

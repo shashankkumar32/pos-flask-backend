@@ -1,8 +1,78 @@
-from flask import Blueprint, request, jsonify
-from .models import db, Order, OrderItem
+from flask import Blueprint, request, jsonify, current_app
+from .models import db, Order, OrderItem, User, License
 from .auth_middleware import token_required
+import bcrypt
+import jwt
+import datetime
+import json
 
 bp = Blueprint('api', __name__, url_prefix='/api')
+
+@bp.route('/auth/electron/signin', methods=['POST'])
+def electron_signin():
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+    machine_id = data.get('machineId')
+    
+    if not username or not password:
+        return jsonify({'message': 'Username and password are required'}), 400
+        
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        return jsonify({'message': 'User not found'}), 404
+        
+    # Verify password
+    if not bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
+        return jsonify({'message': 'Invalid password'}), 401
+        
+    # License & Machine ID Logic
+    license_info = License.query.filter_by(userId=user.id).first()
+    machine_warning = False
+    
+    if not license_info:
+        # First time login with this machine
+        license_info = License(
+            userId=user.id,
+            machineId=machine_id,
+            status='ACTIVE',
+            previousMachineIds=json.dumps([machine_id])
+        )
+        db.session.add(license_info)
+    else:
+        if license_info.machineId != machine_id:
+            machine_warning = True
+            # Update history if not already there
+            previous_ids = json.loads(license_info.previousMachineIds or '[]')
+            if machine_id not in previous_ids:
+                previous_ids.append(machine_id)
+                license_info.previousMachineIds = json.dumps(previous_ids)
+            # Update lastLogin nonetheless
+        license_info.lastLogin = datetime.datetime.utcnow()
+    
+    db.session.commit()
+    
+    # Generate 15-day token
+    token = jwt.encode({
+        'id': user.id,
+        'role': user.role,
+        'mainBranchId': user.mainBranchId,
+        'exp': datetime.datetime.utcnow() + datetime.timedelta(days=15)
+    }, current_app.config['SECRET_KEY'], algorithm=current_app.config['JWT_ALGORITHM'])
+    
+    return jsonify({
+        'accessToken': token,
+        'user': {
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'role': user.role,
+            'mainBranchId': user.mainBranchId,
+            'licenseKey': license_info.licenseKey
+        },
+        'machineWarning': machine_warning,
+        'message': 'Login successful' if not machine_warning else 'Logged in from a non-registered system'
+    }), 200
 
 @bp.route('/orders/bulk', methods=['POST'])
 @token_required
@@ -39,7 +109,16 @@ def bulk_create_orders(current_user):
                     # Required field - default if not provided
                     customerName=order_data.get('customerName', 'Bulk Customer'),
                     # Default type for these imports - default now empty string
-                    orderType=order_data.get('orderType', '')
+                    orderType=order_data.get('orderType', ''),
+                    
+                    # New Financial Fields
+                    invoiceId=order_data.get('invoiceId'),
+                    paymentMethod=order_data.get('paymentMethod'),
+                    discount=order_data.get('discount', 0),
+                    serviceCharge=order_data.get('serviceCharge', 0),
+                    gstRate=order_data.get('gstRate', 0),
+                    appliedCharges=json.dumps(order_data.get('appliedCharges', [])),
+                    date=datetime.datetime.fromisoformat(order_data.get('date').replace('Z', '+00:00')) if order_data.get('date') else datetime.datetime.utcnow()
                 )
                 db.session.add(new_order)
                 db.session.flush() # Flush to get order ID

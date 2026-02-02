@@ -21,6 +21,20 @@ class User(db.Model):
     createdAt = db.Column(db.DateTime, default=datetime.utcnow)
     updatedAt = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+class License(db.Model):
+    __tablename__ = 'licenses'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    userId = db.Column(db.Integer, db.ForeignKey('users.id'))
+    machineId = db.Column(db.String(255))
+    licenseKey = db.Column(db.String(255))
+    status = db.Column(db.String(50), default='ACTIVE')
+    lastLogin = db.Column(db.DateTime, default=datetime.utcnow)
+    previousMachineIds = db.Column(db.Text) # Stored as JSON string
+    
+    createdAt = db.Column(db.DateTime, default=datetime.utcnow)
+    updatedAt = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 class Order(db.Model):
     __tablename__ = 'orders'
     
@@ -44,6 +58,15 @@ class Order(db.Model):
     
     # Other fields
     tableStatus = db.Column(db.String(255), default="AVAILABLE")
+    
+    # Financial fields from Electron
+    invoiceId = db.Column(db.String(255))
+    paymentMethod = db.Column(db.String(255))
+    discount = db.Column(db.Numeric(10, 2), default=0)
+    serviceCharge = db.Column(db.Numeric(10, 2), default=0)
+    gstRate = db.Column(db.Numeric(10, 2), default=0)
+    appliedCharges = db.Column(db.Text) # Stored as JSON string
+    date = db.Column(db.DateTime)
     
     createdAt = db.Column(db.DateTime, default=datetime.utcnow)
     updatedAt = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
